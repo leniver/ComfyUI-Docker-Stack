@@ -1,0 +1,43 @@
+services:
+  comfyui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Match your host UID/GID so files written to mounted volumes stay yours
+        UID: "1000"
+        GID: "1000"
+        # Pin to a known-good ComfyUI commit if you want reproducibility
+        COMFYUI_REF: master
+    image: comfyui-multigpu:latest
+    container_name: comfyui
+    restart: unless-stopped
+    ports:
+      - "8188:8188"
+    # Generous shared memory helps PyTorch dataloaders / multi-GPU
+    shm_size: "8gb"
+    # ---- GPU access ----
+    # Requires nvidia-container-toolkit on the host.
+    # Use `count: all` to expose every GPU; switch to `device_ids: ["0","1"]` to pick specific ones.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      # Forwarded into the CMD. Examples below — uncomment what you need.
+      # COMFY_ARGS: "--lowvram"
+      # COMFY_ARGS: "--reserve-vram 0.5"
+      COMFY_ARGS: ""
+      # Optional: hide a GPU from the container
+      # NVIDIA_VISIBLE_DEVICES: "0,1"
+    volumes:
+      # Model files — keep these OUTSIDE the image; they're huge and change often
+      - ./data/models:/opt/ComfyUI/models
+      - ./data/input:/opt/ComfyUI/input
+      - ./data/output:/opt/ComfyUI/output
+      - ./data/user:/opt/ComfyUI/user
+      # Mount custom_nodes too so your installs via ComfyUI-Manager persist between rebuilds
+      - ./data/custom_nodes:/opt/ComfyUI/custom_nodes/_user
